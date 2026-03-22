@@ -738,8 +738,17 @@ footer a:hover { color: var(--amber); }
 </footer>
 
 <script>
-const API = 'https://amfumu-bipv-structural-api.hf.space';
-const KEY  = 'TEST-KEY-FREE-001';
+// Calls go through RapidAPI proxy — NOT directly to Hugging Face
+const API        = 'https://bipv-structural-load-api.p.rapidapi.com';
+const RAPID_HOST = 'bipv-structural-load-api.p.rapidapi.com';
+
+let ACTIVE_KEY  = '';
+let ACTIVE_PLAN = 'free';
+
+function onPlanActivated(plan, key) {
+  ACTIVE_PLAN = plan;
+  ACTIVE_KEY  = key;
+}
 
 function fmt(n, dec=2) {
   if (n==null||isNaN(n)) return '—';
@@ -777,10 +786,22 @@ async function calculate() {
 
   const body = { vb_ms:vb, terrain_category:terrain, building_height_m:bldgH, panel_width_m:pw, panel_height_m:ph, zone, fixings_count:fixings };
 
+  // Require API key
+  if (!ACTIVE_KEY) {
+    setLoading(false);
+    const b = document.getElementById('errorBox');
+    b.innerHTML = `<div class="error-box" style="display:flex;align-items:center;justify-content:space-between;gap:1rem"><span>⚷ An API key is required. Get free access on RapidAPI.</span><button onclick="stOpen()" style="background:var(--amber);color:#0a0c0f;border:none;font-family:var(--mono);font-size:10px;font-weight:500;padding:6px 14px;cursor:pointer;white-space:nowrap;flex-shrink:0">Get Access</button></div>`;
+    b.style.display = 'block';
+    return;
+  }
   try {
     const r = await fetch(`${API}/calculate`, {
       method:'POST',
-      headers:{'Content-Type':'application/json','X-API-Key':KEY},
+      headers:{
+        'Content-Type':'application/json',
+        'X-RapidAPI-Key':  ACTIVE_KEY,
+        'X-RapidAPI-Host': RAPID_HOST
+      },
       body:JSON.stringify(body)
     });
     if (!r.ok) throw new Error(`API ${r.status}`);
@@ -1095,7 +1116,7 @@ function citeStrip(items) {
 <script>
 var ST={
   pricingUrl:'https://rapidapi.com/bethelnedi/api/bipv-structural-load-api/pricing',
-  apiEndpoint:'https://amfumu-bipv-structural-api.hf.space',
+  apiEndpoint:'https://bipv-structural-load-api.p.rapidapi.com',
   proPrice:'$49',
   ultraPrice:'$199',
   proFeats:["Full EN 1990 load combinations", "All bracket force outputs", "Maintenance engineering report", "1,000 API calls/hour"],
@@ -1178,6 +1199,24 @@ stRender();
   var slot=document.getElementById('st-hdr-btn');
   if(wrap&&slot){slot.appendChild(wrap);}
 })();
+
+// ── FREE DAILY LIMIT ──
+// Free users (no key) get 1 analysis per day to protect RapidAPI quota
+function checkFreeLimit() {
+  const key = 'st_free_used_' + new Date().toISOString().slice(0,10);
+  const used = parseInt(localStorage.getItem(key) || '0');
+  return { used, key, allowed: used < 1 };
+}
+function markFreeUsed() {
+  const key = 'st_free_used_' + new Date().toISOString().slice(0,10);
+  localStorage.setItem(key, '1');
+}
+function freeLimitMessage() {
+  return `<div class="error-box" style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
+    <span>&#9888; Free limit reached — 1 analysis per day without a key. Get Pro for unlimited access.</span>
+    <button onclick="stOpen()" style="background:#e8a020;color:#0a0c0f;border:none;font-family:inherit;font-size:10px;font-weight:600;padding:6px 14px;cursor:pointer;white-space:nowrap;flex-shrink:0">Get Pro</button>
+  </div>`;
+}
 </script>
 </body>
 </html>
